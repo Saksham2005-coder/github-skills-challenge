@@ -1,4 +1,7 @@
+import io
+import runpy
 import sys
+from contextlib import redirect_stdout
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -102,3 +105,32 @@ def test_run_pipeline_consumes_generated_anomaly_events():
     assert len(result["anomalies_detected"]) == 2
     assert len(result["events_consumed"]) == 2
     assert result["events_consumed"][0]["type"] == "ANOMALY"
+
+
+def test_producer_rejects_empty_event():
+    topic = EventTopic("empty-events")
+    producer = EventProducer(topic)
+
+    assert producer.publish({}) is False
+    assert topic.get_messages() == []
+
+
+def test_event_topic_clear_removes_messages():
+    topic = EventTopic("events")
+    topic.publish({"type": "ANOMALY", "service": "payment-service"})
+
+    topic.clear()
+
+    assert topic.get_messages() == []
+
+
+def test_pipeline_main_executes_and_prints_summary():
+    buffer = io.StringIO()
+    with redirect_stdout(buffer):
+        runpy.run_module("src.aiops_pipeline", run_name="__main__")
+
+    output = buffer.getvalue()
+    assert "AIOps Pipeline Result" in output
+    assert "Records processed:" in output
+    assert "Anomalies detected:" in output
+    assert "Events consumed:" in output
