@@ -74,3 +74,31 @@ def test_consumer_receives_event():
     messages = consumer.consume()
 
     assert len(messages) == 1
+
+
+def test_warning_log_is_flagged_as_anomaly():
+    detector = AnomalyDetector()
+
+    record = {
+        "timestamp": "2026-09-20T10:10:00",
+        "service": "payment-service",
+        "response_time_ms": 180,
+        "cpu_percent": 55,
+        "memory_percent": 58,
+        "log_level": "WARNING",
+        "message": "Potential slowdown detected"
+    }
+
+    event = detector.detect(record)
+
+    assert event is not None
+    assert "Error log detected" in event["reasons"]
+
+
+def test_run_pipeline_consumes_generated_anomaly_events():
+    result = run_pipeline("data/service_data.json")
+
+    assert result["records_processed"] == 10
+    assert len(result["anomalies_detected"]) == 2
+    assert len(result["events_consumed"]) == 2
+    assert result["events_consumed"][0]["type"] == "ANOMALY"
